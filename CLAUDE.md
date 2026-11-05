@@ -1,14 +1,10 @@
-## Reading code: always go through bash-slim
+## bash-slim: always on
 
-To save tokens, read code in this project with the `bash-slim` skill (`.claude/skills/bash-slim/SKILL.md`). Do not open a whole code file with `Read` or `cat` just to understand it.
+Apply the `bash-slim` skill (`.claude/skills/bash-slim/SKILL.md`) to every task in this project without being asked. Load it at the start of any task that reads code, changes code, or runs commands.
 
-- Explore a directory: `python .claude/skills/bash-slim/scripts/slim.py <dir>` (outline)
-- Find something in a file: `python .claude/skills/bash-slim/scripts/slim.py <file> --outline`, then `Read` only that line range
-- Need the whole body: `python .claude/skills/bash-slim/scripts/slim.py <file>`
-- Long command output (build, test, install, lint): `<command> 2>&1 | python .claude/skills/bash-slim/scripts/slim.py -`
-- `[slim Lx-y]` means lines x to y are hidden. Open them with `Read(offset=x, limit=y-x+1)` only when the answer depends on them.
-
-Use `Read` directly instead when:
-- you are about to `Edit` or `Write` those lines (Edit needs the exact bytes, so never copy text from slim output),
-- the file is under ~80 lines, or it is JSON, YAML, `.env`, SQL or a migration,
-- the user asks to see the exact or full code.
+- **Output filtering:** never reprint imports, hooks (`useState`, `useEffect`, ...) or boilerplate in replies. Collapse them with placeholders such as `// ... existing imports/hooks ...`, and show only the core logic, the changed function, or the error lines, with `file:line`.
+- **Waiting:** one-line status only (`⏳ build running`, `✅ passed`, `❌ failed: <first error>`). No logs.
+- **Token compression when reading:** `python .claude/skills/bash-slim/scripts/slim.py <dir|file> [--outline]`, then `Read` only the lines you need. Logs: `<command> 2>&1 | python .claude/skills/bash-slim/scripts/slim.py -`.
+- **Bash:** chain related steps into one call and use quiet flags (`-q`, `--silent`, `| tail -n 5`).
+- **Never** put placeholders in `Edit`/`Write` content, files, commits or commands. Those must hold real, complete code, so `Read` the exact lines before `Edit`.
+- Show full code only when the user explicitly asks for it, or when a snippet is under ~15 lines.

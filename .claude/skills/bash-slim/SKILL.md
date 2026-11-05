@@ -1,99 +1,92 @@
 ---
 name: bash-slim
-description: Token-saving way to read code. Use whenever you explore or read source files to understand them rather than to edit them right away, such as mapping a directory, finding where something lives, reviewing or explaining a file, or reading any code file over ~80 lines. Prints an outline, or a slim view where imports, runs of useState/useRef-style hook declarations, long comments, Vue/Svelte <style> blocks, near-duplicate lines and very long lines are collapsed into `[slim Lx-y]` placeholders. Also collapses repeated lines in long command output piped through it.
+description: Token compression and output filtering for every task in this project. Use whenever you read code with Read or Bash, show code to the user, report command results, or wait on a long-running command. Collapses imports, hooks (useState, useEffect, ...) and boilerplate into placeholders such as `// ... existing imports/hooks ...`, shows only core logic, the changed function or the failing lines, and keeps waiting/status updates to a single line.
 ---
 
 # bash-slim
 
-Read less first, then read exactly what you need. `scripts/slim.py` collapses boilerplate **before** it reaches the context. Telling yourself to "ignore imports" after a `Read` saves nothing, because the full file is already in the context by then.
+Goal: spend fewer tokens on what you read and on what you write, and answer faster. Target: over 75% less output than printing whole files or whole logs.
 
-## Input
+## Strict rules for output
 
-| What you have | Command (run from the project root) |
+1. **Never reprint long code in full.** In replies to the user, do not print imports, hooks (`useState`, `useEffect`, `useRef`, `useMemo`, `useCallback`, custom `use*`) or boilerplate (providers and wrappers, prop/type declarations nobody changed, styles, config objects, repeated JSX/template markup).
+2. **Collapse them with a placeholder right away**, in the comment syntax of the file:
+
+   | Language | Placeholder |
+   |---|---|
+   | TS / JS | `// ... existing imports/hooks ...` · `// ... existing imports ...` · `// ... existing hooks ...` · `// ... unchanged: handleReset, handleClose ...` |
+   | JSX | `{/* ... existing JSX ... */}` |
+   | Vue / HTML | `<!-- ... existing template ... -->` |
+   | CSS / SCSS | `/* ... existing styles ... */` |
+   | Python | `# ... existing imports ...` |
+
+3. **Print only what matters:** the core logic, the function or block you changed, or the exact lines where the error happens. Put `file:line` above the snippet and keep at most 1–2 lines of context around the change.
+4. **While loading or waiting**, give a one-line status and nothing else, e.g. `⏳ build running (~2 min)`, then `✅ build passed` or `❌ build failed: <first error line>`. Never paste the full log.
+
+### Example
+
+Wasteful:
+
+```tsx
+import React, { useState, useEffect } from "react";
+import { Box, Button, TextField } from "@mui/material";
+import { api } from "@/lib/api";
+// ...20 more lines of imports and hooks...
+const handleSubmit = async () => {
+  if (total < 0) return setError("ห้ามติดลบ");
+  await api.save(form);
+};
+// ...80 lines of JSX...
+```
+
+bash-slim (`src/features/school/school-form.tsx:42`):
+
+```tsx
+// ... existing imports/hooks ...
+const handleSubmit = async () => {
+  if (total < 0) return setError("ห้ามติดลบ"); // new
+  await api.save(form);
+};
+// ... existing JSX ...
+```
+
+## Where placeholders are not allowed
+
+These rules apply only to text shown to the user. The following must always contain real, complete content:
+
+- `Edit` `old_string` / `new_string`, `Write` content, and anything else saved to disk. A placeholder written into a file breaks the code.
+- Commit messages, patches, and shell commands.
+- Code the user explicitly asks to see in full. Show it in full.
+- Snippets under ~15 lines. Collapsing them saves nothing, so show them as they are.
+
+## Token compression when reading (Read / Bash)
+
+Filter before the text reaches the context. Telling yourself to "ignore the imports" after a full `Read` saves nothing.
+
+| Need | Command (from the project root) |
 |---|---|
-| A directory | `python .claude/skills/bash-slim/scripts/slim.py <dir>` (outline of every code file) |
-| One file, you need its shape | `python .claude/skills/bash-slim/scripts/slim.py <file> --outline` |
-| One file, you need its body | `python .claude/skills/bash-slim/scripts/slim.py <file>` |
-| Long command output | `<command> 2>&1 \| python .claude/skills/bash-slim/scripts/slim.py -` |
+| Map a directory | `python .claude/skills/bash-slim/scripts/slim.py <dir>` (outline with line numbers) |
+| Find a function or component | `python .claude/skills/bash-slim/scripts/slim.py <file> --outline`, then `Read(offset, limit)` on that range only |
+| Read a whole file | `python .claude/skills/bash-slim/scripts/slim.py <file>` (imports, hook runs, long comments, `<style>` and repeated lines collapsed to `[slim Lx-y]`) |
+| Long command output | `<command> 2>&1 \| python .claude/skills/bash-slim/scripts/slim.py -` or `\| tail -n 20` |
 
-Use `python3` where `python` is not on PATH. Files of these types get the code rules: `.ts .tsx .js .jsx .mjs .cjs .vue .svelte .py`. Every other file gets only the `similar` and `long` rules.
+- `[slim L12-30]` means lines 12 to 30 are hidden. Open them with `Read(offset=12, limit=19)` only if the answer depends on them.
+- Before `Edit`, `Read` the exact lines you will change.
+- Use `Read` directly for files under ~80 lines, and for JSON, YAML, `.env`, SQL and migrations.
+- Run `python .claude/skills/bash-slim/scripts/slim.py --help` for the other flags (`--keep`, `--stats`, `--numbers`, `--full`).
 
-| Flag | Effect |
-|---|---|
-| `--outline` | Signatures only: functions, components, classes, types, routes, `<template>/<script>/<style>`, with line numbers. Default for directories. |
-| `--full` | Slim view instead of outline for a directory. |
-| `--numbers` | Add line numbers to kept lines in the slim view. Costs about 5 chars per line, so use it only when you need many line references. |
-| `--keep imports,hooks,comments,style,similar,long` | Switch rules off, e.g. `--keep imports` when debugging an import. |
-| `--stats` | Print only the size before and after. |
-| `--lang js\|vue\|py\|text` | Force the language (for stdin or unknown extensions). |
-| `--min-run N` | Minimum hook declarations in a row before collapsing (default 3). |
-| `--max-files N` | Cap on files per directory (default 60). |
+## Bash calls
 
-Directory walks skip `node_modules`, `.git`, `.next`, `dist`, `build`, `coverage`, other hidden folders, `*.min.js`, `*.d.ts`, maps and lockfiles.
+- Chain related steps into one Bash call (for example `git add -A && git commit -q -m "..." && git push -q`). Fewer calls mean fewer `Bash(...)` lines on screen.
+- Use quiet flags and print only the result: `git commit -q`, `git push -q`, `npm ci --silent`, `yarn --silent`, `> /dev/null`, `| tail -n 5`.
+- Let errors through (`2>&1`) so failures are never hidden.
+- Keep the description short, e.g. `Commit + push to dev`.
 
-## Workflow
+## Input / Workflow / Output
 
-1. **Map.** Run the script on the directory. Pick the files that matter from the outline.
-2. **Locate.** Run `--outline` on a file to find the function or component you need. Outline rows carry line numbers.
-3. **Read exactly.** Open only that range with `Read(file, offset=<start>, limit=<count>)`, or run the slim view when you need the whole body.
-4. **Expand on demand.** A placeholder `[slim L12-30]` means lines 12 to 30 are hidden. Open them with `Read(offset=12, limit=19)` or `sed -n '12,30p' <file>` only if the answer depends on them.
-5. **Before editing**, `Read` the exact lines you will change. `Edit` needs the real bytes; slim output is not the file.
-6. **Command output.** Pipe build, test, install and lint output through `slim.py -` when it may be long or repetitive.
-
-## Output
-
-Each file starts with a header that shows the saving:
-
-```
-=== src/app/page.tsx  42→25 lines, 1.0k→0.7k chars (-32%) ===
-"use client";
-[slim L2-6] comment(5): Page header.
-[slim L7-14] imports(4): react, @mui/material, ./types, @/lib/api
-export default function Page({ id }: { id: string }) {
-  [slim L19-23] hooks(4): useState[open, page], useRouter[router], useQuery[data,isLoading]
-  const total = useMemo(() => rows.length, [rows]);
-  useEffect(() => {
-    setOpen(true);
-  }, []);
-  const opts = [
-    { value: 1, label: "a1" },
-[slim L31-33] 3 similar lines
-    { value: 5, label: "a5" },
-  ];
-```
-
-Outline:
-
-```
-=== src/app/page.tsx outline  42→2 lines, 1.0k→0.1k chars (-86%) ===
-   7 [slim L7-14] imports(4): react, @mui/material, ./types, @/lib/api
-  18 export default function Page({ id }: { id: string }) {
-```
-
-With several files, the last line is the total, e.g. `[slim] total 318 files: 1653.9k→146.6k chars (-91%)`.
-
-## What gets collapsed
-
-| Rule | Collapsed | Never collapsed |
-|---|---|---|
-| `imports` | 2 or more import / `require` / re-export statements in a row, including multi-line ones, become one module list | A single import; dynamic `import()`; `import.meta`; `export { x }` without `from` |
-| `hooks` | 3 or more single-line declaration hooks in a row (`useState`, `useRef`, `useRouter`, `useQuery`, `useForm`, ...) become their variable names | `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`, `useImperativeHandle`, and any hook that spans several lines, because those carry logic |
-| `comments` | Block comments and docstrings of 4+ lines, and 4+ `//` or `#` lines in a row, become their first line | Short comments |
-| `style` | `<style>` blocks in `.vue` / `.svelte` | `<template>` and `<script>` |
-| `similar` | 4+ lines in a row that match except for digits, when hiding them saves over ~40 chars; first and last are kept | Lines that differ in text |
-| `long` | Lines over 240 chars are cut to 160 chars plus `…[slim +N chars]` | |
-| blank lines | Runs of blank lines become one | |
-
-## When not to use it
-
-- Right before `Edit` or `Write`. Read the exact lines instead.
-- Files under ~80 lines. The saving is too small, so use `Read`.
-- JSON, YAML, `.env`, SQL, migrations and lockfiles, where every line matters.
-- When the user asks to see the exact or full code.
-- When the bug may sit in an import or a hook declaration. Use `--keep imports,hooks`, or `Read`.
-
-## Rules
-
-- A placeholder is a summary, not code. Never quote it to the user as code, and never put it in an `Edit` `old_string`.
-- If the slim view hides what you need, open the range. Do not guess what is inside a placeholder.
-- When you tell the user what a file does, base it on what you actually opened.
+- **Input:** any task in this project that reads code or logs, changes code, or runs commands.
+- **Workflow:**
+  1. Read compressed: outline first, then only the lines you need.
+  2. Do the work. Edits use real, complete code.
+  3. Reply filtered: changed part plus placeholders, error lines, or a one-line status.
+- **Output:** a short reply with `file:line`, only the changed or failing code, and placeholders for everything else.
