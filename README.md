@@ -92,6 +92,7 @@ bash-slim/
 ├── README.md                     ← ไฟล์นี้
 ├── CLAUDE.md                     ← กฎที่ผูกให้ AI ใช้ skill นี้เองทุกครั้ง
 ├── docs/images/                  ← ภาพประกอบ README
+├── tests/                        ← ทดสอบ A/B: prompt, script ดึงตัวเลขจาก log, ผลรอบ 1 และ 2
 └── .claude/skills/bash-slim/
     ├── SKILL.md                  ← คำสั่งสำหรับ AI: ใช้เมื่อไร, Input, Workflow, Output
     └── scripts/
@@ -218,6 +219,8 @@ sections/manage-schools.actions.ts (440)  38 getSchoolList · 63 getSchoolSummar
 ### ทดสอบงานจริง A/B: AI ปกติ vs AI ที่มี skill
 
 โปรเจกต์ Next.js monorepo จริง (bcp-bmps-app) clone 2 ชุดจาก commit เดียวกัน ชุดหนึ่งมี skill อีกชุดไม่มี ส่งข้อความเดียวกันทุกตัวอักษร (794 ตัวอักษร) ใช้ model เดียวกัน ข้อความมี 5 งาน: เพิ่ม validate เว็บไซต์ในฟอร์ม 1,294 บรรทัด → เช็ก lint/typecheck → commit → ถามว่าหน้าเรียก API อะไร → debug error `fetch failed` ตัวเลขดึงจาก log ของ Claude Code รอบ 2 รีเซ็ตทั้งสองชุดกลับ commit เดิม แล้วส่งข้อความเดิมอีกครั้งหลังแก้ skill
+
+วิธีทดสอบ, prompt, script และตัวเลขทุกตัว (Bash/Read ทุกครั้งของทั้งสองฝั่ง) อยู่ใน [tests/](tests/README.md)
 
 | วัดอะไร | รอบ 1 ปกติ | รอบ 1 skill | รอบ 2 ปกติ | รอบ 2 skill | รอบ 2 ต่าง |
 |---|---|---|---|---|---|

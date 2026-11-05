@@ -1,0 +1,41 @@
+1.
+ฟอร์มข้อมูลพื้นฐานโรงเรียน เว็บไซต์ต้องขึ้นต้นด้วย http:// หรือ https://
+
+2.
+เช็ค lint กับ typecheck
+
+3.
+commit งานนี้
+
+4.
+/context
+
+5.
+/clear
+
+6.
+หน้า /manage/schools อยู่ไฟล์ไหน เรียก API อะไรบ้าง
+
+7.
+/context
+
+8.
+/clear
+
+9.
+Runtime TypeError
+Server
+
+fetch failed
+src\app\features\common\sections\projects.actions.ts (21:15) @ getProjectHeader
+
+  19 | export async function getProjectHeader(slug: string): Promise<ProjectHeader | null> {
+  20 |   const api = await getServerApi();
+> 21 |   const res = await api.api.projects[":slug"].$get({ param: { slug } });
+     |               ^
+  22 |
+  23 |   if (res.status === 404) return null;
+  24 |   if (!res.ok) throw new Error(`Failed to load project (${res.status})`);
+
+10.
+/context
