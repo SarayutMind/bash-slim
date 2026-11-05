@@ -102,7 +102,7 @@ cat bash-slim/CLAUDE.md >> <โปรเจกต์ของคุณ>/CLAUDE.m
 | ใช้ placeholder | `// ... existing imports/hooks ...`, `{/* ... existing JSX ... */}`, `<!-- ... existing template ... -->`, `/* ... existing styles ... */` |
 | แสดงเฉพาะที่สำคัญ | logic หลัก, ฟังก์ชันที่แก้ หรือบรรทัดที่ error พร้อม `file:line` |
 | ตอนรอผล | สถานะบรรทัดเดียว เช่น `⏳ build running`, `✅ passed`, `❌ failed: <error แรก>` |
-| Bash | รวมหลายขั้นเป็นคำสั่งเดียว, ใช้ flag เงียบ (`-q`, `--silent`), แสดงแค่ผลลัพธ์ |
+| Bash | รวมหลายขั้นเป็นคำสั่งเดียว ถ้าสำเร็จแสดงบรรทัดเดียว (เช่น `331555b [FIX] Page size 100`) ตัด warning CRLF และ log ของ husky/lint-staged ทิ้ง ถ้าพังแสดง log เต็มให้เห็น error |
 
 **ข้อยกเว้น:** placeholder ใช้กับข้อความที่แสดงให้คนอ่านเท่านั้น โค้ดที่เขียนลงไฟล์จริง (Edit/Write), commit และคำสั่ง shell ต้องเป็นโค้ดเต็มเสมอ ไม่งั้นโค้ดจะพัง และถ้าขอดูโค้ดเต็มหรือโค้ดสั้นกว่า ~15 บรรทัด AI จะแสดงทั้งหมด
 

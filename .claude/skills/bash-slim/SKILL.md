@@ -75,11 +75,23 @@ Filter before the text reaches the context. Telling yourself to "ignore the impo
 - Use `Read` directly for files under ~80 lines, and for JSON, YAML, `.env`, SQL and migrations.
 - Run `python .claude/skills/bash-slim/scripts/slim.py --help` for the other flags (`--keep`, `--stats`, `--numbers`, `--full`).
 
-## Bash calls
+## Bash calls: silent on success, full output on failure
 
-- Chain related steps into one Bash call (for example `git add -A && git commit -q -m "..." && git push -q`). Fewer calls mean fewer `Bash(...)` lines on screen.
-- Use quiet flags and print only the result: `git commit -q`, `git push -q`, `npm ci --silent`, `yarn --silent`, `> /dev/null`, `| tail -n 5`.
-- Let errors through (`2>&1`) so failures are never hidden.
+`-q` alone is not enough. CRLF warnings come from `git add`, and pre-commit hooks (husky, lint-staged, biome) print their own log no matter what flags `git commit` gets. Capture the output and print it only when the command fails:
+
+```bash
+# commit (+ push): prints one line, e.g. "331555b [FIX] Page size 100", or the full log if a hook fails
+git -c core.safecrlf=false add -A \
+  && out=$(git commit -q -m "..." 2>&1) && git log --oneline -1 || echo "$out"
+git push -q
+
+# any noisy command (build, test, install, migrate)
+out=$(yarn build 2>&1) && echo "✅ build passed" || { echo "❌ build failed"; echo "$out" | tail -n 30; }
+```
+
+- Chain related steps into one Bash call. Fewer calls mean fewer `Bash(...)` lines on screen.
+- Other quiet flags: `npm ci --silent`, `yarn --silent`, `git pull -q`, `git checkout -q`, `git merge -q`.
+- Never drop the failure output. When a command fails, the log is what the user needs.
 - Keep the description short, e.g. `Commit + push to dev`.
 
 ## Input / Workflow / Output
