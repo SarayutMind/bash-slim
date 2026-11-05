@@ -1,5 +1,3 @@
-# Dev-Skill
-
 ## Reading code: always go through bash-slim
 
 To save tokens, read code in this project with the `bash-slim` skill (`.claude/skills/bash-slim/SKILL.md`). Do not open a whole code file with `Read` or `cat` just to understand it.

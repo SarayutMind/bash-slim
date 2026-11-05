@@ -1,7 +1,24 @@
 # bash-slim
 
-Agent Skill ที่ช่วยให้ AI อ่านโค้ดโดยใช้ token น้อยลง
+Agent Skill สำหรับ Claude Code ที่ช่วยให้ AI อ่านโค้ดโดยใช้ token น้อยลง
+
 มันจะยุบส่วนที่ซ้ำซากอย่าง imports, การประกาศ hook ที่เรียงกันยาว, comment ยาว ๆ, `<style>` ของ Vue และบรรทัดที่ซ้ำกันให้เหลือบรรทัดเดียวแบบ `[slim L12-30] ...` **ก่อน**ที่ข้อความจะเข้าไปใน context ของ AI
+
+```
+=== src/app/page.tsx  42→25 lines, 1.0k→0.7k chars (-32%) ===
+"use client";
+[slim L2-6] comment(5): Page header.
+[slim L7-14] imports(4): react, @mui/material, ./types, @/lib/api
+export default function Page({ id }: { id: string }) {
+  [slim L19-23] hooks(4): useState[open, page], useRouter[router], useQuery[data,isLoading]
+  const total = useMemo(() => rows.length, [rows]);
+  useEffect(() => {
+```
+
+| ผลทดสอบ | AI ปกติ | มี skill | ลดลง |
+|---|---|---|---|
+| โปรเจกต์ Next.js 318 ไฟล์ (outline) | 1,653.9k ตัวอักษร | 146.6k | **−91%** |
+| โปรเจกต์ Vue 732 ไฟล์ (outline) | 9,150.2k ตัวอักษร | 538.9k | **−94%** |
 
 ## ปัญหาที่แก้
 
@@ -9,23 +26,38 @@ Agent Skill ที่ช่วยให้ AI อ่านโค้ดโดย�
 - ยิ่งโปรเจกต์ใหญ่ AI ยิ่งเปลือง token และ context เต็มเร็ว พอต้องสรุปบทสนทนาบ่อยขึ้นก็ลืมรายละเอียดงาน
 - การสั่ง AI ว่า "ไม่ต้องสนใจ import" ไม่ช่วยประหยัด เพราะตอนนั้นไฟล์ถูกอ่านเข้า context ไปแล้ว ต้องกรองก่อนอ่าน ซึ่ง script ของ skill นี้ทำให้
 
-## ไฟล์ในโฟลเดอร์
+## ไฟล์ใน repo
 
 ```
-.claude/skills/bash-slim/
-├── SKILL.md          ← คำสั่งสำหรับ AI: ใช้เมื่อไร, Input, Workflow, Output
-├── README.md         ← ไฟล์นี้
-└── scripts/
-    └── slim.py       ← ตัวกรองโค้ด (Python 3.8+, ไม่ต้องติดตั้ง library เพิ่ม)
+bash-slim/
+├── README.md                     ← ไฟล์นี้
+├── CLAUDE.md                     ← กฎที่ผูกให้ AI ใช้ skill นี้เองทุกครั้ง
+└── .claude/skills/bash-slim/
+    ├── SKILL.md                  ← คำสั่งสำหรับ AI: ใช้เมื่อไร, Input, Workflow, Output
+    └── scripts/
+        └── slim.py               ← ตัวกรองโค้ด (Python 3.8+, ไม่ต้องติดตั้ง library เพิ่ม)
 ```
+
+รายละเอียดที่ AI ใช้จริงอยู่ใน [SKILL.md](.claude/skills/bash-slim/SKILL.md)
 
 ## ติดตั้ง
 
-1. Copy โฟลเดอร์ `.claude/skills/bash-slim/` ไปไว้ที่ root ของโปรเจกต์ที่ต้องการใช้
-   หรือไว้ที่ `~/.claude/skills/bash-slim/` เพื่อใช้กับทุกโปรเจกต์
-2. เพิ่มกฎในไฟล์ `CLAUDE.md` ที่ root ของโปรเจกต์ (ดูตัวอย่างใน `CLAUDE.md` ของ repo นี้) เพื่อให้ AI ใช้เองทุกครั้งโดยไม่ต้องสั่ง
-3. เปิด Claude Code ที่ root ของโปรเจกต์นั้น ระบบจะเจอ skill เอง
-4. ต้องมี `python` (Windows) หรือ `python3` (Mac/Linux)
+ต้องมี `python` (Windows) หรือ `python3` (Mac/Linux)
+
+```bash
+git clone https://github.com/SarayutMind/bash-slim.git
+
+# 1. copy skill ไปไว้ในโปรเจกต์ที่ต้องการ
+mkdir -p <โปรเจกต์ของคุณ>/.claude/skills
+cp -r bash-slim/.claude/skills/bash-slim <โปรเจกต์ของคุณ>/.claude/skills/
+
+# 2. ต่อกฎท้าย CLAUDE.md ของโปรเจกต์ ให้ AI ใช้เองโดยไม่ต้องสั่ง
+cat bash-slim/CLAUDE.md >> <โปรเจกต์ของคุณ>/CLAUDE.md
+```
+
+ถ้าอยากใช้กับทุกโปรเจกต์ ให้ copy โฟลเดอร์ skill ไปไว้ที่ `~/.claude/skills/bash-slim/` แทน แล้วเปลี่ยน path ในกฎของ `CLAUDE.md` เป็น `~/.claude/skills/bash-slim/scripts/slim.py`
+
+จากนั้นเปิด Claude Code ที่ root ของโปรเจกต์ ระบบจะเจอ skill เอง
 
 ## วิธีใช้
 
@@ -51,17 +83,12 @@ Agent Skill ที่ช่วยให้ AI อ่านโค้ดโดย�
 4. ถ้าเจอ `[slim L12-30]` แล้วต้องใช้ส่วนนั้น ค่อยเปิดบรรทัด 12–30
 5. ก่อนแก้โค้ด ให้อ่านบรรทัดจริงก่อนทุกครั้ง ห้ามแก้จากข้อความที่ถูกยุบ
 
-**Output:**
+**Output:** ไฟล์ที่ยุบแล้ว พร้อมหัวบอกขนาดก่อนและหลัง (ตัวอย่างด้านบน) ส่วนโหมด outline จะเหลือแค่ชื่อฟังก์ชันพร้อมเลขบรรทัด:
 
 ```
-=== src/app/page.tsx  42→25 lines, 1.0k→0.7k chars (-32%) ===
-"use client";
-[slim L2-6] comment(5): Page header.
-[slim L7-14] imports(4): react, @mui/material, ./types, @/lib/api
-export default function Page({ id }: { id: string }) {
-  [slim L19-23] hooks(4): useState[open, page], useRouter[router], useQuery[data,isLoading]
-  const total = useMemo(() => rows.length, [rows]);
-  useEffect(() => {
+=== src/app/page.tsx outline  42→2 lines, 1.0k→0.1k chars (-86%) ===
+   7 [slim L7-14] imports(4): react, @mui/material, ./types, @/lib/api
+  18 export default function Page({ id }: { id: string }) {
 ```
 
 ## สิ่งที่ถูกยุบ และสิ่งที่ไม่ยุบ
