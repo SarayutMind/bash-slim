@@ -1,5 +1,7 @@
 # bash-slim
 
+![bash-slim: Token compression & output filtering for Claude Code](docs/images/Bash-Slim%201.png)
+
 Agent Skill สำหรับ Claude Code ทำ 2 อย่างเพื่อลด token และให้ AI ตอบเร็วขึ้น
 
 1. **Output Filtering** เวลา AI ตอบ จะไม่พิมพ์ imports, hooks (`useState`, `useEffect`) และ boilerplate ซ้ำ แต่ใช้ placeholder อย่าง `// ... existing imports/hooks ...` แทน แสดงเฉพาะ logic หลัก ฟังก์ชันที่แก้ หรือบรรทัดที่ error และตอนรอคำสั่งจะสรุปสถานะบรรทัดเดียว ไม่พ่น log
@@ -37,6 +39,8 @@ export default function Page({ id }: { id: string }) {
 
 ## ปัญหาที่แก้
 
+![ก่อนและหลังใช้ bash-slim: จาก 120 บรรทัดเหลือ 8 บรรทัด](docs/images/Bash-Slim%202.png)
+
 - AI มักพิมพ์โค้ดทั้งไฟล์กลับมาให้ดู ทั้งที่แก้แค่ 2–3 บรรทัด ทำให้เปลือง token, ตอบช้า และหาจุดที่แก้ยาก
 - ตอนรอ build หรือ test AI มักพ่น log ยาวออกมาทั้งที่อยากรู้แค่ว่าผ่านหรือไม่ผ่าน
 - ปกติ AI จะอ่านไฟล์ด้วย `Read` ทั้งไฟล์ ซึ่งมี import 20 บรรทัด, `useState` 10 บรรทัด และ CSS อีกหลายร้อยบรรทัดติดเข้าไปด้วย ทั้งที่ส่วนใหญ่ไม่ได้ใช้ตอบคำถาม
@@ -49,6 +53,7 @@ export default function Page({ id }: { id: string }) {
 bash-slim/
 ├── README.md                     ← ไฟล์นี้
 ├── CLAUDE.md                     ← กฎที่ผูกให้ AI ใช้ skill นี้เองทุกครั้ง
+├── docs/images/                  ← ภาพประกอบ README
 └── .claude/skills/bash-slim/
     ├── SKILL.md                  ← คำสั่งสำหรับ AI: ใช้เมื่อไร, Input, Workflow, Output
     └── scripts/
@@ -102,6 +107,8 @@ cat bash-slim/CLAUDE.md >> <โปรเจกต์ของคุณ>/CLAUDE.m
 **ข้อยกเว้น:** placeholder ใช้กับข้อความที่แสดงให้คนอ่านเท่านั้น โค้ดที่เขียนลงไฟล์จริง (Edit/Write), commit และคำสั่ง shell ต้องเป็นโค้ดเต็มเสมอ ไม่งั้นโค้ดจะพัง และถ้าขอดูโค้ดเต็มหรือโค้ดสั้นกว่า ~15 บรรทัด AI จะแสดงทั้งหมด
 
 ## Input / Workflow / Output
+
+![Workflow: Read compressed → Edit real code → Reply slim](docs/images/Bash-Slim%203.png)
 
 **Input:** งานใดก็ได้ในโปรเจกต์ที่ต้องอ่านโค้ด/log, แก้โค้ด หรือรันคำสั่ง (ส่วนอ่านโค้ด: path ของไฟล์หรือโฟลเดอร์ หรือ output ของคำสั่งที่ส่งผ่าน `|`)
 
