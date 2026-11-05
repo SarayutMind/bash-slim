@@ -3,7 +3,8 @@
 
 Usage:
   python slim.py FILE [FILE ...]          slim view of each file
-  python slim.py DIR                      outline of every code file under DIR
+  python slim.py DIR                      map: one line per code file, top-level names + line numbers
+  python slim.py DIR --outline            detailed outline of every code file under DIR
   python slim.py DIR --full               slim view of every code file under DIR
   python slim.py FILE --outline           signatures only
   some-command 2>&1 | python slim.py -    collapse repeated lines in command output
@@ -55,7 +56,7 @@ RE_OUTLINE = {
         r"^\s*(export\s+)?(default\s+)?(async\s+)?function\b"
         r"|^\s*(export\s+)?(const|let)\s+\w+\s*(:[^=]+)?=\s*(async\s*)?(\(|function|\w+\s*=>|React\.|memo|forwardRef|styled|create\w*\()"
         r"|^\s*(export\s+)?(default\s+)?(abstract\s+)?class\s+\w+"
-        r"|^\s*(export\s+)?(declare\s+)?(interface|type|enum)\s+\w+"
+        r"|^\s*(export\s+)?(declare\s+)?(interface\s+\w+|enum\s+\w+|type\s+\w+\s*(<[^=]*>)?\s*=)"
         r"|^\s*export\s+default\b"
         r"|^\s*\w+\.(get|post|put|patch|delete|route|use)\(\s*['\"`]"
         r"|^\s*(const\s+\w+\s*=\s*)?define(Props|Emits|Model|Expose)\b"
@@ -63,6 +64,14 @@ RE_OUTLINE = {
     ),
     "py": re.compile(r"^\s*(async\s+)?def\s+\w+|^\s*class\s+\w+|^@\w+"),
 }
+# Directory map: the name declared by a top-level outline row.
+RE_DECL_NAME = re.compile(
+    r"^(?:export\s+)?(?:default\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?"
+    r"(?:function\*?\s*(\w+)|class\s+(\w+)|(?:const|let|var)\s+(\w+)|interface\s+(\w+)|type\s+(\w+)|enum\s+(\w+))"
+)
+RE_DEFINE = re.compile(r"^(?:const\s+\w+\s*=\s*)?(define\w+)")
+RE_PY_NAME = re.compile(r"^(?:async\s+)?(?:def|class)\s+(\w+)")
+MAP_NAMES = 12  # names per file in a directory map
 
 
 def lang_of(path):
@@ -284,20 +293,55 @@ def clip(line, keep):
 
 def outline(lines, lang, keep):
     out = []
+    skip = range(0)
     if "imports" not in keep:
         # first import block, wherever it starts (after a directive, header comment, or <script>)
         for k in range(len(lines)):
             end, mods, stmts = scan_imports(lines, k, lang)
             if stmts:
                 out.append((k + 1, f"[slim L{k + 1}-{end}] imports({stmts}): {short_list(mods)}"))
+                skip = range(k, end)
                 break
     pattern = RE_OUTLINE.get("js" if lang in JS_LIKE else lang)
     if pattern:
         for idx, line in enumerate(lines):
-            if pattern.match(line):
+            if idx not in skip and pattern.match(line):
                 text = line.rstrip()
                 out.append((idx + 1, text if len(text) <= 160 else text[:160] + " …"))
     return out
+
+
+def top_names(lines, lang):
+    """(line, name) of each top-level function, component, class or type."""
+    names = []
+    pattern = RE_OUTLINE.get("js" if lang in JS_LIKE else lang)
+    for idx, line in enumerate(lines):
+        if not line or line[0].isspace():
+            continue
+        if lang == "py":
+            m = RE_PY_NAME.match(line)
+            if m:
+                names.append((idx + 1, m.group(1)))
+            continue
+        if not (pattern and pattern.match(line)):
+            continue
+        m = RE_DECL_NAME.match(line)
+        if m:
+            names.append((idx + 1, next(g for g in m.groups() if g)))
+        elif line.startswith("export default"):
+            names.append((idx + 1, "default"))
+        else:
+            m = RE_DEFINE.match(line)
+            if m:
+                names.append((idx + 1, m.group(1)))
+    return names
+
+
+def map_line(rel, lines, lang):
+    names = top_names(lines, lang)
+    shown = " · ".join(f"{ln} {name}" for ln, name in names[:MAP_NAMES])
+    more = f" · +{len(names) - MAP_NAMES}" if len(names) > MAP_NAMES else ""
+    return f"{rel} ({len(lines)})" + (f"  {shown}{more}" if shown else "")
 
 
 def read_text(path):
@@ -325,12 +369,13 @@ def walk(root):
 def main():
     ap = argparse.ArgumentParser(description="Token-saving code viewer (bash-slim).")
     ap.add_argument("paths", nargs="+", help="files, directories, or - for stdin")
-    ap.add_argument("--outline", action="store_true", help="signatures only (default for directories)")
+    ap.add_argument("--outline", action="store_true",
+                    help="signatures only; for a directory, a detailed outline of every file instead of the one-line map")
     ap.add_argument("--full", action="store_true", help="slim view even for directories")
     ap.add_argument("--keep", default="", help=f"comma list of rules to switch off: {','.join(sorted(RULES))}")
     ap.add_argument("--lang", default=None, help="force language for stdin/unknown files: js|vue|py|text")
     ap.add_argument("--min-run", type=int, default=3, help="min hook declarations to collapse (default 3)")
-    ap.add_argument("--max-files", type=int, default=60, help="cap files per directory (default 60)")
+    ap.add_argument("--max-files", type=int, default=None, help="cap files per directory (default 300 for a map, 60 otherwise)")
     ap.add_argument("--numbers", action="store_true",
                     help="prefix kept lines with line numbers in slim view (outline always has them; costs ~5 chars/line)")
     ap.add_argument("--stats", action="store_true", help="only print size before/after")
@@ -346,22 +391,37 @@ def main():
     if unknown:
         ap.error(f"unknown --keep rule(s): {', '.join(sorted(unknown))}")
 
-    jobs = []  # (label, lines, lang, outline_mode)
+    jobs = []  # (label, lines, lang, outline_mode); lines None = print label as is
     for p in args.paths:
         if p == "-":
             jobs.append(("<stdin>", sys.stdin.read().splitlines(), args.lang or "text", args.outline))
         elif os.path.isdir(p):
             files = list(walk(p))
-            for f in files[: args.max_files]:
+            as_map = not (args.outline or args.full)
+            cap = args.max_files or (300 if as_map else 60)
+            rows, before = [], 0
+            for f in files[:cap]:
                 lines = read_text(f)
-                if lines is not None:
-                    try:
-                        label = os.path.relpath(f)
-                    except ValueError:  # different drive on Windows
-                        label = f
-                    jobs.append((label, lines, args.lang or lang_of(f), not args.full or args.outline))
-            if len(files) > args.max_files:
-                jobs.append((f"[slim] +{len(files) - args.max_files} more files under {p} (raise --max-files)", None, None, None))
+                if lines is None:
+                    continue
+                if as_map:
+                    rows.append(map_line(os.path.relpath(f, p).replace(os.sep, "/"), lines, args.lang or lang_of(f)))
+                    before += sum(len(l) + 1 for l in lines)
+                    continue
+                try:
+                    label = os.path.relpath(f)
+                except ValueError:  # different drive on Windows
+                    label = f
+                jobs.append((label, lines, args.lang or lang_of(f), True if args.outline else not args.full))
+            more = f"[slim] +{len(files) - cap} more files under {p} (raise --max-files)" if len(files) > cap else ""
+            if as_map:
+                body = "\n".join(rows + ([more] if more else []))
+                after = len(body) + 1
+                head = (f"=== {p} map: {len(rows)} files, {before / 1000:.1f}k→{after / 1000:.1f}k chars "
+                        f"({change(before, after)}) · file (lines)  line name · --outline for detail ===")
+                jobs.append((head + ("" if args.stats else "\n" + body), None, None, None))
+            elif more:
+                jobs.append((more, None, None, None))
         elif os.path.isfile(p):
             lines = read_text(p)
             if lines is None:

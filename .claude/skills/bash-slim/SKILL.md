@@ -7,6 +7,8 @@ description: Token compression and output filtering for every task in this proje
 
 Goal: spend fewer tokens on what you read and on what you write, and answer faster. Target: over 75% less output than printing whole files or whole logs.
 
+**Reply in the user's language.** A Thai prompt gets a Thai reply. This file is in English only to keep it short.
+
 ## Strict rules for output
 
 1. **Never reprint long code in full.** In replies to the user, do not print imports, hooks (`useState`, `useEffect`, `useRef`, `useMemo`, `useCallback`, custom `use*`) or boilerplate (providers and wrappers, prop/type declarations nobody changed, styles, config objects, repeated JSX/template markup).
@@ -65,7 +67,8 @@ Filter before the text reaches the context. Telling yourself to "ignore the impo
 
 | Need | Command (from the project root) |
 |---|---|
-| Map a directory | `python .claude/skills/bash-slim/scripts/slim.py <dir>` (outline with line numbers) |
+| Find where something is (a route, an API call, a function) | `Grep` first. It is the cheapest search. |
+| Map a directory | `python .claude/skills/bash-slim/scripts/slim.py <dir>` (one line per file: `path (lines)  line name · line name`) |
 | Find a function or component | `python .claude/skills/bash-slim/scripts/slim.py <file> --outline`, then `Read(offset, limit)` on that range only |
 | Read a whole file | `python .claude/skills/bash-slim/scripts/slim.py <file>` (imports, hook runs, long comments, `<style>` and repeated lines collapsed to `[slim Lx-y]`) |
 | Long command output | `<command> 2>&1 \| python .claude/skills/bash-slim/scripts/slim.py -` or `\| tail -n 20` |
@@ -73,9 +76,31 @@ Filter before the text reaches the context. Telling yourself to "ignore the impo
 - `[slim L12-30]` means lines 12 to 30 are hidden. Open them with `Read(offset=12, limit=19)` only if the answer depends on them.
 - Before `Edit`, `Read` the exact lines you will change.
 - Use `Read` directly for files under ~80 lines, and for JSON, YAML, `.env`, SQL and migrations.
+- Never run `slim.py <dir> --outline` or `--full` on a whole directory. Map it, then outline only the files you need.
 - Run `python .claude/skills/bash-slim/scripts/slim.py --help` for the other flags (`--keep`, `--stats`, `--numbers`, `--full`).
 
-## Bash calls: silent on success, full output on failure
+## Bash calls: short command in, one line out
+
+The user sees every Bash call as a box with the command (IN) and its output (OUT). Keep both short.
+
+### Lint / typecheck / build / test: use `check.sh`
+
+```bash
+bash .claude/skills/bash-slim/scripts/check.sh              # fix + typecheck → "✅ fix · ✅ typecheck (41s)"
+bash .claude/skills/bash-slim/scripts/check.sh typecheck build test        # package.json scripts by name
+bash .claude/skills/bash-slim/scripts/check.sh fix 'api=yarn workspace @repo/api typecheck'   # name=command
+```
+
+- `fix` runs biome (or prettier / eslint) with `--write` on changed files only, like lint-staged.
+- On failure it prints the error lines with `file:line` (many biome diagnostics are grouped by rule), the tool's summary (`Found 441 errors`), whether your changed files appear in the log, and the path of the full log.
+- Trust those lines. When they say `none of your changed files appear in this log`, the errors were already there: report that in one line and move on. Do not run extra commands to investigate them.
+- Run it from the project root. Do not write your own `| tail`, `| grep` or `2>&1` chains for these checks.
+
+### Edit files with `Edit`, not scripts
+
+Never change source files with `python - <<'EOF'`, `sed -i`, `perl -pi` or `cat > file <<EOF` inside Bash. The whole script lands in IN. `Edit` shows only the changed lines as a diff.
+
+### Other commands: silent on success, full output on failure
 
 `-q` alone is not enough. CRLF warnings come from `git add`, and pre-commit hooks (husky, lint-staged, biome) print their own log no matter what flags `git commit` gets. Capture the output and print it only when the command fails:
 
@@ -92,7 +117,7 @@ out=$(yarn build 2>&1) && echo "✅ build passed" || { echo "❌ build failed"; 
 - Chain related steps into one Bash call. Fewer calls mean fewer `Bash(...)` lines on screen.
 - Other quiet flags: `npm ci --silent`, `yarn --silent`, `git pull -q`, `git checkout -q`, `git merge -q`.
 - Never drop the failure output. When a command fails, the log is what the user needs.
-- Keep the description short, e.g. `Commit + push to dev`.
+- Keep the description short, e.g. `Commit + push to dev`, `Lint + typecheck`.
 
 ## Input / Workflow / Output
 

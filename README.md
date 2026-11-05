@@ -34,8 +34,9 @@ export default function Page({ id }: { id: string }) {
 
 | ผลทดสอบ | AI ปกติ | มี skill | ลดลง |
 |---|---|---|---|
-| โปรเจกต์ Next.js 318 ไฟล์ (outline) | 1,653.9k ตัวอักษร | 146.6k | **−91%** |
-| โปรเจกต์ Vue 732 ไฟล์ (outline) | 9,150.2k ตัวอักษร | 538.9k | **−94%** |
+| ภาพรวมโปรเจกต์ Next.js 319 ไฟล์ | 1,676.6k ตัวอักษร | 37.6k | **−98%** |
+| ภาพรวมโปรเจกต์ Vue 732 ไฟล์ | 9,150.2k ตัวอักษร | 114.8k | **−99%** |
+| ทดสอบงานจริง A/B (แก้โค้ด + เช็ก + commit + อ่านโค้ด + debug) | 1,885k token | 1,684k | −11% (รอบ 1) |
 
 ## ปัญหาที่แก้
 
@@ -43,9 +44,45 @@ export default function Page({ id }: { id: string }) {
 
 - AI มักพิมพ์โค้ดทั้งไฟล์กลับมาให้ดู ทั้งที่แก้แค่ 2–3 บรรทัด ทำให้เปลือง token, ตอบช้า และหาจุดที่แก้ยาก
 - ตอนรอ build หรือ test AI มักพ่น log ยาวออกมาทั้งที่อยากรู้แค่ว่าผ่านหรือไม่ผ่าน
+- ตอนสั่ง lint/typecheck กล่อง `Bash` บนจอเต็มไปด้วยคำสั่งยาว (python heredoc, `| tail`, `| grep`) และ log หลายสิบบรรทัด
 - ปกติ AI จะอ่านไฟล์ด้วย `Read` ทั้งไฟล์ ซึ่งมี import 20 บรรทัด, `useState` 10 บรรทัด และ CSS อีกหลายร้อยบรรทัดติดเข้าไปด้วย ทั้งที่ส่วนใหญ่ไม่ได้ใช้ตอบคำถาม
 - ยิ่งโปรเจกต์ใหญ่ AI ยิ่งเปลือง token และ context เต็มเร็ว พอต้องสรุปบทสนทนาบ่อยขึ้นก็ลืมรายละเอียดงาน
 - การสั่ง AI ว่า "ไม่ต้องสนใจ import" ไม่ช่วยประหยัด เพราะตอนนั้นไฟล์ถูกอ่านเข้า context ไปแล้ว ต้องกรองก่อนอ่าน ซึ่ง script ของ skill นี้ทำให้
+
+## Bash: คำสั่งสั้น ผลสั้น
+
+ทุกครั้งที่ AI รัน Bash จอจะแสดงกล่องที่มีคำสั่ง (IN) และผลลัพธ์ (OUT) กล่องนี้แอปเป็นคนแสดง skill ซ่อนไม่ได้ แต่ทำให้ทั้ง IN และ OUT สั้นลงได้
+
+ก่อน (IN ~15 บรรทัด, OUT สูงสุด 28 บรรทัดแม้จะผ่าน):
+
+```
+Bash  Add type import, lint, typecheck both apps
+  IN   python - <<'EOF'
+       def edit(p, pairs): ...
+       EOF
+       cd ... && yarn biome check --write $(git diff --name-only) ... | tail -15; yarn workspace @repo/api typecheck 2>&1 | tail -3; ...
+  OUT  log ของ biome และ typecheck
+```
+
+หลัง: แก้ไฟล์ด้วย `Edit` (จอแสดงเฉพาะบรรทัดที่แก้) แล้วเช็กด้วย `check.sh`
+
+```
+Bash  Lint + typecheck
+  IN   bash .claude/skills/bash-slim/scripts/check.sh
+  OUT  ✅ fix · ✅ typecheck (51s)
+```
+
+ถ้าพัง จะแสดงเฉพาะบรรทัด error พร้อม `file:line` และที่อยู่ของ log เต็ม:
+
+```
+❌ fix · ✅ api · ❌ backoffice (14s)
+
+── ❌ backoffice ──
+src/app/features/manage-schools/components/school-year-forms.tsx(1056,14): error TS2322: Type 'string' is not assignable to type 'number'.
+… 1 of 3 lines, full log: C:/Users/<you>/AppData/Local/Temp/bash-slim/backoffice.log
+```
+
+`check.sh` ไม่ต้องตั้งค่า: หา package manager (yarn/pnpm/npm/bun) จาก lockfile, `fix` ใช้ biome (หรือ prettier/eslint) `--write` กับไฟล์ที่แก้เท่านั้นแบบเดียวกับ lint-staged, ชื่ออื่นจะรัน script ใน `package.json` และใส่คำสั่งเองได้ด้วย `ชื่อ=คำสั่ง`
 
 ## ไฟล์ใน repo
 
@@ -57,14 +94,15 @@ bash-slim/
 └── .claude/skills/bash-slim/
     ├── SKILL.md                  ← คำสั่งสำหรับ AI: ใช้เมื่อไร, Input, Workflow, Output
     └── scripts/
-        └── slim.py               ← ตัวกรองโค้ด (Python 3.8+, ไม่ต้องติดตั้ง library เพิ่ม)
+        ├── slim.py               ← ตัวกรองโค้ด (Python 3.8+, ไม่ต้องติดตั้ง library เพิ่ม)
+        └── check.sh              ← รัน lint/typecheck/build/test ผ่านบรรทัดเดียว พังโชว์เฉพาะ error (bash)
 ```
 
 รายละเอียดที่ AI ใช้จริงอยู่ใน [SKILL.md](.claude/skills/bash-slim/SKILL.md)
 
 ## ติดตั้ง
 
-ต้องมี `python` (Windows) หรือ `python3` (Mac/Linux)
+ต้องมี `python` (Windows) หรือ `python3` (Mac/Linux) และ `bash` สำหรับ `check.sh` (Windows ใช้ Git Bash)
 
 ```bash
 git clone https://github.com/SarayutMind/bash-slim.git
@@ -77,7 +115,7 @@ cp -r bash-slim/.claude/skills/bash-slim <โปรเจกต์ของค�
 cat bash-slim/CLAUDE.md >> <โปรเจกต์ของคุณ>/CLAUDE.md
 ```
 
-ถ้าอยากใช้กับทุกโปรเจกต์ ให้ copy โฟลเดอร์ skill ไปไว้ที่ `~/.claude/skills/bash-slim/` แทน แล้วเปลี่ยน path ในกฎของ `CLAUDE.md` เป็น `~/.claude/skills/bash-slim/scripts/slim.py`
+ถ้าอยากใช้กับทุกโปรเจกต์ ให้ copy โฟลเดอร์ skill ไปไว้ที่ `~/.claude/skills/bash-slim/` แทน แล้วเปลี่ยน path ในกฎของ `CLAUDE.md` เป็น `~/.claude/skills/bash-slim/scripts/...`
 
 จากนั้นเปิด Claude Code ที่ root ของโปรเจกต์ ระบบจะเจอ skill เอง
 
@@ -87,12 +125,15 @@ cat bash-slim/CLAUDE.md >> <โปรเจกต์ของคุณ>/CLAUDE.m
 
 | ต้องการ | คำสั่ง |
 |---|---|
-| ดูภาพรวมทั้งโฟลเดอร์ | `python .claude/skills/bash-slim/scripts/slim.py src/` |
+| ดูภาพรวมทั้งโฟลเดอร์ (ไฟล์ละบรรทัด: จำนวนบรรทัด + ชื่อฟังก์ชัน/component) | `python .claude/skills/bash-slim/scripts/slim.py src/` |
 | ดูโครงไฟล์ (ชื่อฟังก์ชัน/component + เลขบรรทัด) | `python .claude/skills/bash-slim/scripts/slim.py src/page.tsx --outline` |
 | อ่านทั้งไฟล์แบบยุบแล้ว | `python .claude/skills/bash-slim/scripts/slim.py src/page.tsx` |
 | ย่อ log ยาว ๆ | `yarn build 2>&1 \| python .claude/skills/bash-slim/scripts/slim.py -` |
 | ดูว่าประหยัดได้เท่าไร | ใส่ `--stats` ต่อท้ายคำสั่ง |
 | ไม่ให้ยุบบางอย่าง | `--keep imports,hooks` (ตัวเลือก: imports, hooks, comments, style, similar, long) |
+| lint + typecheck | `bash .claude/skills/bash-slim/scripts/check.sh` |
+| รัน script อื่นใน package.json | `bash .claude/skills/bash-slim/scripts/check.sh build test` |
+| รันคำสั่งเอง | `bash .claude/skills/bash-slim/scripts/check.sh 'api=yarn workspace @repo/api typecheck'` |
 
 ## กฎการแสดงผล (Output Filtering)
 
@@ -103,6 +144,8 @@ cat bash-slim/CLAUDE.md >> <โปรเจกต์ของคุณ>/CLAUDE.m
 | แสดงเฉพาะที่สำคัญ | logic หลัก, ฟังก์ชันที่แก้ หรือบรรทัดที่ error พร้อม `file:line` |
 | ตอนรอผล | สถานะบรรทัดเดียว เช่น `⏳ build running`, `✅ passed`, `❌ failed: <error แรก>` |
 | Bash | รวมหลายขั้นเป็นคำสั่งเดียว ถ้าสำเร็จแสดงบรรทัดเดียว (เช่น `331555b [FIX] Page size 100`) ตัด warning CRLF และ log ของ husky/lint-staged ทิ้ง ถ้าพังแสดง log เต็มให้เห็น error |
+| lint / typecheck / build / test | ใช้ `check.sh` คำสั่งบรรทัดเดียว ผลบรรทัดเดียว ไม่ต่อ `\| tail` `\| grep` เอง |
+| แก้ไฟล์ | ใช้ `Edit` ห้ามใช้ `python - <<'EOF'`, `sed -i` หรือ heredoc ใน Bash เพราะโค้ดทั้งก้อนจะไปโผล่ใน IN |
 
 **ข้อยกเว้น:** placeholder ใช้กับข้อความที่แสดงให้คนอ่านเท่านั้น โค้ดที่เขียนลงไฟล์จริง (Edit/Write), commit และคำสั่ง shell ต้องเป็นโค้ดเต็มเสมอ ไม่งั้นโค้ดจะพัง และถ้าขอดูโค้ดเต็มหรือโค้ดสั้นกว่า ~15 บรรทัด AI จะแสดงทั้งหมด
 
@@ -113,7 +156,7 @@ cat bash-slim/CLAUDE.md >> <โปรเจกต์ของคุณ>/CLAUDE.m
 **Input:** งานใดก็ได้ในโปรเจกต์ที่ต้องอ่านโค้ด/log, แก้โค้ด หรือรันคำสั่ง (ส่วนอ่านโค้ด: path ของไฟล์หรือโฟลเดอร์ หรือ output ของคำสั่งที่ส่งผ่าน `|`)
 
 **Workflow ของ AI:**
-1. ดู outline ของโฟลเดอร์เพื่อเลือกไฟล์
+1. หาของด้วย `Grep` ก่อน หรือดูภาพรวมโฟลเดอร์ (ไฟล์ละบรรทัด) เพื่อเลือกไฟล์
 2. ดู outline ของไฟล์เพื่อหาฟังก์ชันที่ต้องการ
 3. เปิดอ่านเฉพาะช่วงบรรทัดนั้นด้วย `Read`
 4. ถ้าเจอ `[slim L12-30]` แล้วต้องใช้ส่วนนั้น ค่อยเปิดบรรทัด 12–30
@@ -125,6 +168,15 @@ cat bash-slim/CLAUDE.md >> <โปรเจกต์ของคุณ>/CLAUDE.m
 === src/app/page.tsx outline  42→2 lines, 1.0k→0.1k chars (-86%) ===
    7 [slim L7-14] imports(4): react, @mui/material, ./types, @/lib/api
   18 export default function Page({ id }: { id: string }) {
+```
+
+ภาพรวมโฟลเดอร์ (ไฟล์ละบรรทัด):
+
+```
+=== features/manage-schools map: 30 files, 275.5k→4.0k chars (-99%) ===
+components/school-basic-form.tsx (1302)  106 gradeOptions · 110 gradesReversed · 122 SchoolBasicForm
+page/manage-schools-page.tsx (96)  16 readFilters · 35 ManageSchoolsPage
+sections/manage-schools.actions.ts (440)  38 getSchoolList · 63 getSchoolSummary · 75 getSchoolFilterOptions · … · +19
 ```
 
 ## สิ่งที่ถูกยุบ และสิ่งที่ไม่ยุบ
@@ -144,31 +196,59 @@ cat bash-slim/CLAUDE.md >> <โปรเจกต์ของคุณ>/CLAUDE.m
 
 | การทดสอบ | AI ปกติ (`Read` ทั้งไฟล์) | มี skill | ลดลง |
 |---|---|---|---|
-| โปรเจกต์ Next.js 318 ไฟล์ แบบ outline | 1,653.9k ตัวอักษร | 146.6k | **−91%** |
-| โปรเจกต์ Vue 732 ไฟล์ แบบ outline | 9,150.2k ตัวอักษร | 538.9k | **−94%** |
+| โปรเจกต์ Next.js 319 ไฟล์ ภาพรวมโฟลเดอร์ (ไฟล์ละบรรทัด) | 1,676.6k ตัวอักษร | 37.6k | **−98%** |
+| โปรเจกต์ Vue 732 ไฟล์ ภาพรวมโฟลเดอร์ (ไฟล์ละบรรทัด) | 9,150.2k ตัวอักษร | 114.8k | **−99%** |
+| โปรเจกต์ Next.js 319 ไฟล์ outline ละเอียดทุกไฟล์ (`--outline`) | 1,676.6k | 144.3k | −91% |
+| โปรเจกต์ Vue 732 ไฟล์ outline ละเอียดทุกไฟล์ (`--outline`) | 9,150.2k | 538.9k | −94% |
 | ไฟล์ตัวอย่าง `.tsx` 42 บรรทัด แบบเต็ม | 1.0k | 0.7k | −32% |
 | ไฟล์ตัวอย่าง `.vue` แบบเต็ม | 0.3k | 0.2k | −11% |
 | log build ที่ซ้ำกัน 30 บรรทัด | 2.4k | 0.2k | −92% |
 
-**บทเรียนจากการทดสอบ:** เวอร์ชันแรกใส่เลขบรรทัดทุกบรรทัดในโหมดเต็ม ผลคือแทบไม่ประหยัด (Next.js −2%) และ**ใหญ่ขึ้น**ในโปรเจกต์ Vue (+10%) เพราะเลขบรรทัดกินมากกว่าที่ยุบได้ เวอร์ชันนี้จึงปิดเลขบรรทัดในโหมดเต็ม และให้ AI เริ่มจาก outline ซึ่งเป็นจุดที่ประหยัดได้มากที่สุด
+`check.sh` ทดสอบกับโปรเจกต์ Next.js monorepo จริง (turbo, biome, 6 packages):
 
-**ยังไม่ได้ทดสอบ:**
-- Output Filtering: เป้าคือลด token ของคำตอบเกิน 75% แต่ยังไม่ได้วัดจริง (ใช้ตารางด้านล่าง เทียบคำตอบของงานแก้โค้ดชิ้นเดียวกัน)
-- โหมดเต็ม (ไม่มีเลขบรรทัด) กับโปรเจกต์จริง
-- คุณภาพคำตอบ ว่าใช้ token น้อยลงแล้ว AI ยังตอบถูกเท่าเดิมไหม
+| กรณี | OUT ที่เห็น |
+|---|---|
+| ไม่มีไฟล์แก้ typecheck ผ่าน | `– fix (no changed files) · ✅ typecheck (51s)` 1 บรรทัด |
+| type error 1 จุด | สรุป 1 บรรทัด + error 5 บรรทัด (log จริง 19 บรรทัด) |
+| biome error + type error, แยก typecheck 2 app | สรุป 1 บรรทัด + error ของแต่ละขั้น (biome 7 จาก 20, typecheck 1 จาก 3) |
+| ชื่อ step ที่ไม่มี | `❌ nope` + `no "nope" script in package.json` |
+| lint ทั้ง repo พังเพราะ CRLF (441 errors) + type error | lint 9 บรรทัด: จัดกลุ่ม `format ×20`, `Found 441 errors`, บอกว่าเป็น CRLF และไม่ใช่ไฟล์ที่แก้ (เดิม 40 บรรทัด) |
 
-วิธีทดสอบคุณภาพ: ถามคำถามเดียวกันกับ 2 session (มีและไม่มี `CLAUDE.md` + skill) แล้วกรอกตารางนี้
+### ทดสอบงานจริง A/B: AI ปกติ vs AI ที่มี skill (รอบ 1)
 
-| คำถาม | token ที่ใช้ (ปกติ / skill) | ตอบถูกไหม (ปกติ / skill) | ต้องถามซ้ำกี่รอบ (ปกติ / skill) |
+โปรเจกต์ Next.js monorepo จริง (bcp-bmps-app) clone 2 ชุดจาก commit เดียวกัน ชุดหนึ่งมี skill อีกชุดไม่มี ส่งข้อความเดียวกันทุกตัวอักษร (794 ตัวอักษร) ใช้ model เดียวกัน ข้อความมี 5 งาน: เพิ่ม validate เว็บไซต์ในฟอร์ม 1,294 บรรทัด → เช็ก lint/typecheck → commit → ถามว่าหน้าเรียก API อะไร → debug error `fetch failed` ตัวเลขดึงจาก log ของ Claude Code
+
+| วัดอะไร | ปกติ | skill | ต่าง |
 |---|---|---|---|
-| "component X อยู่ไฟล์ไหน รับ props อะไร" | | | |
-| "หน้า Y เรียก API อะไรบ้าง" | | | |
-| "อธิบาย flow ของฟอร์ม Z" | | | |
+| token รวมที่ประมวลผล | 1,885k | 1,684k | **−11%** |
+| token ที่ AI เขียน | 13,085 | 11,485 | −12% |
+| ขนาดที่อ่านด้วย `Read` | 23.7k ตัวอักษร | 11.8k | **−50%** |
+| อ่านฟอร์ม 1,294 บรรทัด | 420 บรรทัด (18.8k) | outline 19 บรรทัด + อ่าน 100 บรรทัด (6.1k) | **−68%** |
+| ความยาวคำสั่ง Bash (IN) | 4,397 ตัวอักษร | 2,064 | **−53%** |
+| จำนวนครั้งที่เรียก Bash | 17 | 10 | −41% |
+| log ของ commit | 17 บรรทัด (lint-staged) | 3 บรรทัด | **−71%** |
+| ความยาวคำตอบ | 4,396 ตัวอักษร | 3,655 | −17% |
+| ความถูกต้อง | ถูกทั้ง 3 คำถาม | ถูกทั้ง 3 คำถาม | เท่ากัน |
 
-ดู token ที่ใช้ได้ด้วยคำสั่ง `/context` หรือ `/cost` ใน Claude Code
+ทั้งสองฝั่งเปิด plugin ย่อคำตอบ (caveman) ไว้ ความยาวคำตอบเลยต่างกันไม่มาก
+
+**สิ่งที่เจอในรอบ 1 และแก้แล้ว:**
+
+| ปัญหา | ผล | แก้ |
+|---|---|---|
+| ดูภาพรวมโฟลเดอร์ 30 ไฟล์ได้ 24.9k ตัวอักษรก้อนเดียว | กิน token เกือบหมดที่ประหยัดได้ | เปลี่ยนเป็นไฟล์ละบรรทัด เหลือ 4.3k (−83%) และแนะนำให้ใช้ `Grep` ก่อน |
+| lint ทั้ง repo พังเพราะ CRLF, `check.sh` โชว์ diff 40 บรรทัด | AI เรียก Bash เพิ่มอีก 3 ครั้งเพื่อหาสาเหตุ | จัดกลุ่ม error, โชว์ `Found N errors`, บอกว่าเป็น CRLF และไม่ใช่ไฟล์ที่แก้ |
+| ฝั่ง skill ตอบเป็นภาษาอังกฤษ | กฎเขียนเป็นอังกฤษ AI เลยตอบตาม | เพิ่มกฎ "ตอบภาษาเดียวกับที่ผู้ใช้ถาม" |
+
+**บทเรียนจากการทดสอบ:** เวอร์ชันแรกใส่เลขบรรทัดทุกบรรทัดในโหมดเต็ม ผลคือแทบไม่ประหยัด (Next.js −2%) และ**ใหญ่ขึ้น**ในโปรเจกต์ Vue (+10%) เพราะเลขบรรทัดกินมากกว่าที่ยุบได้ เวอร์ชันนี้จึงปิดเลขบรรทัดในโหมดเต็ม และให้ AI เริ่มจากภาพรวมหรือ outline ซึ่งเป็นจุดที่ประหยัดได้มากที่สุด
+
+**ยังไม่ได้ทดสอบ:** A/B รอบ 2 หลังแก้ 3 จุดข้างบน
 
 ## ข้อจำกัด
 
 - ยุบตามรูปแบบของบรรทัด (regex) ไม่ได้ parse โค้ดจริง ถ้าเขียนโค้ดแปลก ๆ อาจยุบไม่ครบ แต่ไม่ได้แก้ไฟล์ จึงไม่มีผลกับโค้ด
 - ไม่เหมาะกับไฟล์สั้นกว่า ~80 บรรทัด, JSON, `.env`, SQL และ migration
 - ถ้าบัคอยู่ใน import หรือ hook ให้ใช้ `--keep imports,hooks` หรืออ่านไฟล์ตรง ๆ
+- กล่อง `Bash` และ IN บนจอเป็นของแอป skill ทำได้แค่ให้สั้นลง ซ่อนไม่ได้
+- `check.sh` ช่วยเฉพาะงานที่ทำซ้ำบ่อย (lint, typecheck, build, test) คำสั่งอื่นยังต้องพิมพ์เต็ม
+- กฎใน `CLAUDE.md` เป็นคำสั่งให้ AI ทำตาม ไม่ใช่การบังคับ บางครั้ง AI อาจกลับไปเขียนคำสั่งยาวเอง
