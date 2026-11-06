@@ -41,9 +41,21 @@ export default function Page({ id }: { id: string }) {
 
 ## ติดตั้ง
 
-ต้องมี Claude Code, `git`, `python` 3.8 ขึ้นไป (Mac/Linux อาจใช้ชื่อ `python3`) และ `bash` สำหรับ `check.sh` (Windows ใช้ Git Bash ที่มากับ Git for Windows)
+ติดตั้งเป็น plugin ของ Claude Code:
 
-### ติดตั้งในโปรเจกต์ (แนะนำ)
+```bash
+claude plugin marketplace add SarayutMind/bash-slim
+claude plugin install bash-slim@bash-slim
+```
+
+หรือพิมพ์ใน Claude Code บรรทัดเดียว (v2.1.275 ขึ้นไป): `/plugin install bash-slim --marketplace SarayutMind/bash-slim`
+
+ติดตั้งเสร็จให้เปิด session ใหม่ plugin จะสั่งให้ AI ใช้ skill เองทุก session โดยไม่ต้องแก้ `CLAUDE.md` เครื่องต้องมี `python` 3.8 ขึ้นไปและ `bash` (Windows ใช้ Git Bash ที่มากับ Git for Windows)
+
+อัปเดต `claude plugin update bash-slim@bash-slim` · ถอน `claude plugin uninstall bash-slim@bash-slim`
+
+<details>
+<summary>ไม่ใช้ plugin: copy skill เข้าโปรเจกต์ (เช่น อยาก commit ให้ทั้งทีมใช้)</summary>
 
 เปิด terminal ที่ root ของโปรเจกต์ที่จะใช้ แล้ววางคำสั่งชุดใดชุดหนึ่ง
 
@@ -72,25 +84,11 @@ Remove-Item -Recurse -Force $tmp
 1. copy โฟลเดอร์ `.claude/skills/bash-slim/` เข้าโปรเจกต์
 2. ต่อกฎจาก [CLAUDE.md](CLAUDE.md) ไว้ท้าย `CLAUDE.md` ของโปรเจกต์ (ยังไม่มีไฟล์ก็สร้างให้) กฎนี้ทำให้ AI ใช้ skill เองโดยไม่ต้องสั่ง
 
-เช็กว่าติดตั้งแล้ว: รัน `python .claude/skills/bash-slim/scripts/slim.py --help` ต้องขึ้น `usage: slim.py ...` จากนั้นเปิด Claude Code ที่ root ของโปรเจกต์ พิมพ์ `/` จะเห็น `bash-slim` ในรายการ
+เช็กว่าติดตั้งแล้ว: รัน `python .claude/skills/bash-slim/scripts/slim.py --help` ต้องขึ้น `usage: slim.py ...`
 
-### ติดตั้งครั้งเดียว ใช้ได้ทุกโปรเจกต์ (global)
+อัปเดต: รันชุดเดิมซ้ำ แต่ข้ามบรรทัดที่ต่อท้าย `CLAUDE.md` ไม่งั้นกฎจะซ้ำ · ถอน: ลบโฟลเดอร์ `.claude/skills/bash-slim/` แล้วลบหัวข้อ `## bash-slim: always on` ออกจาก `CLAUDE.md`
 
-ใส่ skill ไว้ที่ `~/.claude/skills/` และกฎไว้ที่ `~/.claude/CLAUDE.md` คำสั่งนี้เปลี่ยน path ใน `SKILL.md` และในกฎเป็น `~/.claude/skills/bash-slim/...` ให้เอง (รันใน Mac / Linux / Git Bash)
-
-```bash
-tmp=$(mktemp -d) && git clone -q --depth 1 https://github.com/SarayutMind/bash-slim.git "$tmp"
-s='s#\.claude/skills/bash-slim#~/.claude/skills/bash-slim#g'
-mkdir -p ~/.claude/skills && cp -r "$tmp/.claude/skills/bash-slim" ~/.claude/skills/
-sed "$s" "$tmp/.claude/skills/bash-slim/SKILL.md" > ~/.claude/skills/bash-slim/SKILL.md
-printf '\n\n' >> ~/.claude/CLAUDE.md && sed "$s" "$tmp/CLAUDE.md" >> ~/.claude/CLAUDE.md
-rm -rf "$tmp"
-```
-
-### อัปเดต / ถอนการติดตั้ง
-
-- **อัปเดต:** รันคำสั่งติดตั้งชุดเดิมซ้ำ แต่ข้ามบรรทัดที่ต่อท้าย `CLAUDE.md` ไม่งั้นกฎจะซ้ำ 2 ชุด
-- **ถอน:** ลบโฟลเดอร์ `.claude/skills/bash-slim/` (หรือ `~/.claude/skills/bash-slim/`) แล้วลบหัวข้อ `## bash-slim: always on` ออกจาก `CLAUDE.md`
+</details>
 
 ## ปัญหาที่แก้
 
@@ -144,6 +142,8 @@ src/app/features/manage-schools/components/school-year-forms.tsx(1056,14): error
 bash-slim/
 ├── README.md                     ← ไฟล์นี้
 ├── CLAUDE.md                     ← กฎที่ผูกให้ AI ใช้ skill นี้เองทุกครั้ง
+├── .claude-plugin/               ← plugin.json + marketplace.json ให้ติดตั้งผ่าน `claude plugin install` ได้
+├── hooks/                        ← hook ตอนเริ่ม session: ส่งกฎใน CLAUDE.md ให้ AI โดยเปลี่ยน path เป็นของ plugin
 ├── docs/images/                  ← ภาพประกอบ README
 ├── tests/                        ← ทดสอบ A/B: prompt, script ดึงตัวเลขจาก log, ผลรอบ 1 และ 2
 └── .claude/skills/bash-slim/
@@ -157,7 +157,7 @@ bash-slim/
 
 ## วิธีใช้
 
-ปกติไม่ต้องสั่งอะไร เพราะ `CLAUDE.md` บอก AI ให้ใช้เองอยู่แล้ว ถ้าอยากเรียกเองก็พิมพ์ `/bash-slim` หรือสั่งรันตรง ๆ:
+ปกติไม่ต้องสั่งอะไร เพราะ plugin (หรือกฎใน `CLAUDE.md` ถ้า copy เอง) บอก AI ให้ใช้เองอยู่แล้ว ถ้าอยากเรียกเองก็พิมพ์ `/bash-slim:bash-slim` (แบบ plugin) หรือ `/bash-slim` (แบบ copy) หรือสั่งรันตรง ๆ (path ในตารางเป็นของแบบ copy ถ้าติดตั้งแบบ plugin AI จะใช้ path ของ plugin ให้เอง):
 
 | ต้องการ | คำสั่ง |
 |---|---|
@@ -303,4 +303,4 @@ skill  IN   bash .claude/skills/bash-slim/scripts/check.sh
 - ถ้าบัคอยู่ใน import หรือ hook ให้ใช้ `--keep imports,hooks` หรืออ่านไฟล์ตรง ๆ
 - กล่อง `Bash` และ IN บนจอเป็นของแอป skill ทำได้แค่ให้สั้นลง ซ่อนไม่ได้
 - `check.sh` ช่วยเฉพาะงานที่ทำซ้ำบ่อย (lint, typecheck, build, test) คำสั่งอื่นยังต้องพิมพ์เต็ม
-- กฎใน `CLAUDE.md` เป็นคำสั่งให้ AI ทำตาม ไม่ใช่การบังคับ บางครั้ง AI อาจกลับไปเขียนคำสั่งยาวเอง
+- กฎ (จาก plugin หรือ `CLAUDE.md`) เป็นคำสั่งให้ AI ทำตาม ไม่ใช่การบังคับ บางครั้ง AI อาจกลับไปเขียนคำสั่งยาวเอง

@@ -1,0 +1,17 @@
+{
+  "name": "bash-slim",
+  "owner": {
+    "name": "SarayutMind"
+  },
+  "metadata": {
+    "description": "Token compression and output filtering skill for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "bash-slim",
+      "source": "./",
+      "description": "Token compression and output filtering for Claude Code: collapse imports, hooks and boilerplate before they reach the context, and keep command output to one line.",
+      "category": "development"
+    }
+  ]
+}

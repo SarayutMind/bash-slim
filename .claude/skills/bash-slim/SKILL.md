@@ -65,19 +65,21 @@ These rules apply only to text shown to the user. The following must always cont
 
 Filter before the text reaches the context. Telling yourself to "ignore the imports" after a full `Read` saves nothing.
 
+The scripts live in `${CLAUDE_SKILL_DIR}/scripts/`. Keep the quotes around the path: it may contain spaces or Windows backslashes.
+
 | Need | Command (from the project root) |
 |---|---|
 | Find where something is (a route, an API call, a function) | `Grep` first. It is the cheapest search. |
-| Map a directory | `python .claude/skills/bash-slim/scripts/slim.py <dir>` (one line per file: `path (lines)  line name · line name`) |
-| Find a function or component | `python .claude/skills/bash-slim/scripts/slim.py <file> --outline`, then `Read(offset, limit)` on that range only |
-| Read a whole file | `python .claude/skills/bash-slim/scripts/slim.py <file>` (imports, hook runs, long comments, `<style>` and repeated lines collapsed to `[slim Lx-y]`) |
-| Long command output | `<command> 2>&1 \| python .claude/skills/bash-slim/scripts/slim.py -` or `\| tail -n 20` |
+| Map a directory | `python "${CLAUDE_SKILL_DIR}/scripts/slim.py" <dir>` (one line per file: `path (lines)  line name · line name`) |
+| Find a function or component | `python "${CLAUDE_SKILL_DIR}/scripts/slim.py" <file> --outline`, then `Read(offset, limit)` on that range only |
+| Read a whole file | `python "${CLAUDE_SKILL_DIR}/scripts/slim.py" <file>` (imports, hook runs, long comments, `<style>` and repeated lines collapsed to `[slim Lx-y]`) |
+| Long command output | `<command> 2>&1 \| python "${CLAUDE_SKILL_DIR}/scripts/slim.py" -` or `\| tail -n 20` |
 
 - `[slim L12-30]` means lines 12 to 30 are hidden. Open them with `Read(offset=12, limit=19)` only if the answer depends on them.
 - Before `Edit`, `Read` the exact lines you will change.
 - Use `Read` directly for files under ~80 lines, and for JSON, YAML, `.env`, SQL and migrations.
 - Never run `slim.py <dir> --outline` or `--full` on a whole directory. Map it, then outline only the files you need.
-- Run `python .claude/skills/bash-slim/scripts/slim.py --help` for the other flags (`--keep`, `--stats`, `--numbers`, `--full`).
+- Run `python "${CLAUDE_SKILL_DIR}/scripts/slim.py" --help` for the other flags (`--keep`, `--stats`, `--numbers`, `--full`).
 
 ## Bash calls: short command in, one line out
 
@@ -86,9 +88,9 @@ The user sees every Bash call as a box with the command (IN) and its output (OUT
 ### Lint / typecheck / build / test: use `check.sh`
 
 ```bash
-bash .claude/skills/bash-slim/scripts/check.sh              # fix + typecheck → "✅ fix · ✅ typecheck (41s)"
-bash .claude/skills/bash-slim/scripts/check.sh typecheck build test        # package.json scripts by name
-bash .claude/skills/bash-slim/scripts/check.sh fix 'api=yarn workspace @repo/api typecheck'   # name=command
+bash "${CLAUDE_SKILL_DIR}/scripts/check.sh"              # fix + typecheck → "✅ fix · ✅ typecheck (41s)"
+bash "${CLAUDE_SKILL_DIR}/scripts/check.sh" typecheck build test        # package.json scripts by name
+bash "${CLAUDE_SKILL_DIR}/scripts/check.sh" fix 'api=yarn workspace @repo/api typecheck'   # name=command
 ```
 
 - `fix` runs biome (or prettier / eslint) with `--write` on changed files only, like lint-staged.

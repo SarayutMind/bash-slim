@@ -1,0 +1,12 @@
+{
+  "name": "bash-slim",
+  "description": "Token compression and output filtering for Claude Code: collapse imports, hooks and boilerplate before they reach the context, and keep command output to one line.",
+  "author": {
+    "name": "SarayutMind",
+    "url": "https://github.com/SarayutMind"
+  },
+  "homepage": "https://github.com/SarayutMind/bash-slim",
+  "repository": "https://github.com/SarayutMind/bash-slim",
+  "keywords": ["tokens", "context", "output-filtering", "skill"],
+  "skills": ["./.claude/skills/bash-slim"]
+}
