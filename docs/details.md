@@ -168,7 +168,7 @@ bash-slim/
 ├── .claude-plugin/               ← plugin.json + marketplace.json ให้ติดตั้งผ่าน `claude plugin install` ได้
 ├── hooks/                        ← hook ตอนเริ่ม session: ส่งกฎใน CLAUDE.md ให้ AI โดยเปลี่ยน path เป็นของ plugin
 ├── docs/                         ← หน้านี้ + ภาพประกอบ
-├── tests/                        ← ทดสอบ A/B: prompt, script ดึงตัวเลขจาก log, ผลรอบ 1 และ 2
+├── tests/                        ← ทดสอบ A/B: prompt, script ดึงตัวเลขจาก log, ผลรอบ 1 และ 2, ไฟล์ตัวอย่างใน samples/
 └── .claude/skills/bash-slim/
     ├── SKILL.md                  ← คำสั่งสำหรับ AI: ใช้เมื่อไร, Input, Workflow, Output
     └── scripts/
