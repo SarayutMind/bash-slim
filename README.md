@@ -10,6 +10,20 @@ Plugin สำหรับ Claude Code ที่ทำให้ AI **อ่าน
 - **ตอบเฉพาะที่แก้:** AI ไม่พิมพ์โค้ดทั้งไฟล์กลับมา แสดงแค่ส่วนที่เปลี่ยน ที่เหลือแทนด้วย `// ... existing imports/hooks ...`
 - **คำสั่งสั้น ผลสั้น:** lint / typecheck / build / test สั่งบรรทัดเดียว ผ่านก็ตอบบรรทัดเดียว พังก็โชว์แค่บรรทัดที่ error
 
+## Input / Workflow / Output
+
+- **Input:** งานไหนก็ได้ในโปรเจกต์ที่ AI ต้องอ่านโค้ดหรือ log, แก้โค้ด หรือรันคำสั่ง เช่น "เพิ่ม validate ในฟอร์ม", "เช็ก lint กับ typecheck", "debug error นี้" พิมพ์สั่งงานตามปกติ ไม่ต้องเรียก skill เอง
+- **Output:** คำตอบสั้นที่มี `file:line` แสดงแค่โค้ดที่แก้หรือบรรทัดที่ error ส่วนที่ไม่ได้แก้แทนด้วย placeholder และผลเช็กเหลือบรรทัดเดียว เช่น `✅ fix · ✅ typecheck (51s)`
+
+![Workflow: Read compressed → Edit real code → Reply slim](docs/images/Bash-Slim%203.png)
+
+| ขั้น | Input | ทำอะไร | Output |
+|---|---|---|---|
+| 1. อ่าน | โฟลเดอร์หรือไฟล์ | `Grep` หาก่อน แล้ว `slim.py` ยุบ import, hook, comment ยาว, CSS | ไฟล์ละบรรทัด, outline ของไฟล์ หรือโค้ดย่อที่มี `[slim L12-30]` บอกว่าซ่อนบรรทัดไหน |
+| 2. แก้ | บรรทัดจริงที่เปิดด้วย `Read` (ไม่ใช่ข้อความที่ถูกยุบ) | `Edit` ด้วยโค้ดเต็ม ไม่มี placeholder | ไฟล์ที่แก้แล้ว จอแสดงเฉพาะบรรทัดที่เปลี่ยน |
+| 3. เช็ก | ชื่อขั้น เช่น `fix`, `typecheck`, `build`, `test` | `check.sh` รัน biome/prettier เฉพาะไฟล์ที่แก้ และรัน script ใน `package.json` | `✅` บรรทัดเดียว หรือเฉพาะบรรทัด error พร้อม `file:line` และที่อยู่ log เต็ม |
+| 4. ตอบ | ผลจากขั้น 1–3 | ตัดโค้ดซ้ำ, import, hook, log | `file:line` + โค้ดที่แก้ + placeholder หรือสถานะบรรทัดเดียว |
+
 ## ติดตั้ง
 
 ```bash
