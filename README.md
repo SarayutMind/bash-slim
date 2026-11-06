@@ -39,6 +39,59 @@ export default function Page({ id }: { id: string }) {
 | ทดสอบงานจริง A/B: output ของ Bash ทั้งงาน | 38.0k ตัวอักษร | 5.6k | **−85%** |
 | ทดสอบงานจริง A/B: token รวมทั้งงาน (แก้โค้ด + เช็ก + commit + อ่านโค้ด + debug) | 2,186k | 1,837k | −16% |
 
+## ติดตั้ง
+
+ต้องมี Claude Code, `git`, `python` 3.8 ขึ้นไป (Mac/Linux อาจใช้ชื่อ `python3`) และ `bash` สำหรับ `check.sh` (Windows ใช้ Git Bash ที่มากับ Git for Windows)
+
+### ติดตั้งในโปรเจกต์ (แนะนำ)
+
+เปิด terminal ที่ root ของโปรเจกต์ที่จะใช้ แล้ววางคำสั่งชุดใดชุดหนึ่ง
+
+**Mac / Linux / Git Bash**
+
+```bash
+tmp=$(mktemp -d) && git clone -q --depth 1 https://github.com/SarayutMind/bash-slim.git "$tmp"
+mkdir -p .claude/skills && cp -r "$tmp/.claude/skills/bash-slim" .claude/skills/
+printf '\n\n' >> CLAUDE.md && cat "$tmp/CLAUDE.md" >> CLAUDE.md
+rm -rf "$tmp"
+```
+
+**Windows PowerShell**
+
+```powershell
+$tmp = Join-Path $env:TEMP "bash-slim-$(Get-Random)"
+git clone -q --depth 1 https://github.com/SarayutMind/bash-slim.git $tmp
+New-Item -ItemType Directory -Force .claude\skills | Out-Null
+Copy-Item -Recurse -Force "$tmp\.claude\skills\bash-slim" .claude\skills\
+Add-Content -Encoding utf8 CLAUDE.md ("`n" + (Get-Content -Raw -Encoding utf8 "$tmp\CLAUDE.md"))
+Remove-Item -Recurse -Force $tmp
+```
+
+ทั้งสองชุดทำ 2 อย่าง:
+
+1. copy โฟลเดอร์ `.claude/skills/bash-slim/` เข้าโปรเจกต์
+2. ต่อกฎจาก [CLAUDE.md](CLAUDE.md) ไว้ท้าย `CLAUDE.md` ของโปรเจกต์ (ยังไม่มีไฟล์ก็สร้างให้) กฎนี้ทำให้ AI ใช้ skill เองโดยไม่ต้องสั่ง
+
+เช็กว่าติดตั้งแล้ว: รัน `python .claude/skills/bash-slim/scripts/slim.py --help` ต้องขึ้น `usage: slim.py ...` จากนั้นเปิด Claude Code ที่ root ของโปรเจกต์ พิมพ์ `/` จะเห็น `bash-slim` ในรายการ
+
+### ติดตั้งครั้งเดียว ใช้ได้ทุกโปรเจกต์ (global)
+
+ใส่ skill ไว้ที่ `~/.claude/skills/` และกฎไว้ที่ `~/.claude/CLAUDE.md` คำสั่งนี้เปลี่ยน path ใน `SKILL.md` และในกฎเป็น `~/.claude/skills/bash-slim/...` ให้เอง (รันใน Mac / Linux / Git Bash)
+
+```bash
+tmp=$(mktemp -d) && git clone -q --depth 1 https://github.com/SarayutMind/bash-slim.git "$tmp"
+s='s#\.claude/skills/bash-slim#~/.claude/skills/bash-slim#g'
+mkdir -p ~/.claude/skills && cp -r "$tmp/.claude/skills/bash-slim" ~/.claude/skills/
+sed "$s" "$tmp/.claude/skills/bash-slim/SKILL.md" > ~/.claude/skills/bash-slim/SKILL.md
+printf '\n\n' >> ~/.claude/CLAUDE.md && sed "$s" "$tmp/CLAUDE.md" >> ~/.claude/CLAUDE.md
+rm -rf "$tmp"
+```
+
+### อัปเดต / ถอนการติดตั้ง
+
+- **อัปเดต:** รันคำสั่งติดตั้งชุดเดิมซ้ำ แต่ข้ามบรรทัดที่ต่อท้าย `CLAUDE.md` ไม่งั้นกฎจะซ้ำ 2 ชุด
+- **ถอน:** ลบโฟลเดอร์ `.claude/skills/bash-slim/` (หรือ `~/.claude/skills/bash-slim/`) แล้วลบหัวข้อ `## bash-slim: always on` ออกจาก `CLAUDE.md`
+
 ## ปัญหาที่แก้
 
 ![ก่อนและหลังใช้ bash-slim: จาก 120 บรรทัดเหลือ 8 บรรทัด](docs/images/Bash-Slim%202.png)
@@ -101,25 +154,6 @@ bash-slim/
 ```
 
 รายละเอียดที่ AI ใช้จริงอยู่ใน [SKILL.md](.claude/skills/bash-slim/SKILL.md)
-
-## ติดตั้ง
-
-ต้องมี `python` (Windows) หรือ `python3` (Mac/Linux) และ `bash` สำหรับ `check.sh` (Windows ใช้ Git Bash)
-
-```bash
-git clone https://github.com/SarayutMind/bash-slim.git
-
-# 1. copy skill ไปไว้ในโปรเจกต์ที่ต้องการ
-mkdir -p <โปรเจกต์ของคุณ>/.claude/skills
-cp -r bash-slim/.claude/skills/bash-slim <โปรเจกต์ของคุณ>/.claude/skills/
-
-# 2. ต่อกฎท้าย CLAUDE.md ของโปรเจกต์ ให้ AI ใช้เองโดยไม่ต้องสั่ง
-cat bash-slim/CLAUDE.md >> <โปรเจกต์ของคุณ>/CLAUDE.md
-```
-
-ถ้าอยากใช้กับทุกโปรเจกต์ ให้ copy โฟลเดอร์ skill ไปไว้ที่ `~/.claude/skills/bash-slim/` แทน แล้วเปลี่ยน path ในกฎของ `CLAUDE.md` เป็น `~/.claude/skills/bash-slim/scripts/...`
-
-จากนั้นเปิด Claude Code ที่ root ของโปรเจกต์ ระบบจะเจอ skill เอง
 
 ## วิธีใช้
 
